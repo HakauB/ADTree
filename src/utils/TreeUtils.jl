@@ -54,7 +54,7 @@ function split_dataset(x::AbstractMatrix{Int}, split_index::Int, split_value::In
     return left_indices, right_indices
 end
 
-function update_pgh!(y::AbstractVector{T}, new_weight::T, predictions::AbstractVector{T}, gradients::AbstractVector{T}, hessians::AbstractVector{T}, indices::Vector{Int}, params::HyperParameters) where T <: Number
+function update_pgh!(y::AbstractVector{T}, new_weight::T, predictions::AbstractVector{T}, gradients::AbstractVector{T}, hessians::AbstractVector{T}, indices::Vector{Int}, params::HyperParameters) where T <: AbstractFloat
     if isa(params.case_weights, Vector{T})
         @inbounds for i in indices
             predictions[i] += new_weight * params.learning_rate
@@ -119,6 +119,18 @@ end
         hess_bins[bin_i] += hessians[y_i, i]
     end
     return grad_bins, hess_bins
+end
+
+function update_pgh!(y::AbstractMatrix{Int}, new_weight::T, predictions::AbstractMatrix{T}, gradients::AbstractMatrix{T}, hessians::AbstractMatrix{T}, y_i::Int, indices::Vector{Int}, params::HyperParameters) where T <: Number
+    if isa(params.case_weights, Vector{T})
+        predictions[y_i, indices] .= predictions[y_i, indices] .+ new_weight .* params.learning_rate
+        gradients[:, indices] .= params.grad_func(y[:, indices], predictions[:, indices]) .* params.case_weights[indices]
+        hessians[:, indices] .= params.hess_func(y[:, indices], predictions[:, indices]) .* params.case_weights[indices]
+    else
+        predictions[y_i, indices] .= predictions[y_i, indices] .+ new_weight .* params.learning_rate
+        gradients[:, indices] .= params.grad_func(y[:, indices], predictions[:, indices])
+        hessians[:, indices] .= params.hess_func(y[:, indices], predictions[:, indices])
+    end
 end
 
 ###############################################################################

@@ -92,9 +92,6 @@ function train_greedy(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_p
 
             left_inds, right_inds = split_dataset(x, best_split_index, best_split_value, best_node.indices)
 
-            #left_g, left_h = vec(sum(gradients[y_i, left_inds], dims=2)), vec(sum(hessians[y_i, left_inds], dims=2))
-            #right_g, right_h = vec(sum(gradients[y_i, right_inds], dims=2)), vec(sum(hessians[y_i, right_inds], dims=2))
-
             left_g, left_h = vec_sum(gradients, y_i, left_inds), vec_sum(hessians, y_i, left_inds)
             right_g, right_h = vec_sum(gradients, y_i, right_inds), vec_sum(hessians, y_i, right_inds)
 
@@ -110,14 +107,8 @@ function train_greedy(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_p
             push!(curr_stack, left_node)
             push!(curr_stack, right_node)
 
-            predictions[y_i, left_inds] .+= left_weight .* params.learning_rate
-            predictions[y_i, right_inds] .+= right_weight .* params.learning_rate
-
-            gradients .= params.grad_func(y, predictions) .* params.case_weights[left_inds]
-            gradients .= params.grad_func(y, predictions) .* params.case_weights[right_inds]
-
-            hessians .= params.hess_func(y, predictions) .* params.case_weights[left_inds]
-            hessians .= params.hess_func(y, predictions) .* params.case_weights[right_inds]
+            update_pgh!(y, left_weight, predictions, gradients, hessians, y_i, left_inds, params)
+            update_pgh!(y, right_weight, predictions, gradients, hessians, y_i, right_inds, params)
         end
     end
     return roots, predictions
@@ -179,9 +170,6 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_
 
             left_inds, right_inds = split_dataset(x, best_split_index, best_split_value, best_node.indices)
 
-            #left_g, left_h = vec(sum(gradients[y_i, left_inds], dims=2)), vec(sum(hessians[y_i, left_inds], dims=2))
-            #right_g, right_h = vec(sum(gradients[y_i, right_inds], dims=2)), vec(sum(hessians[y_i, right_inds], dims=2))
-
             left_g, left_h = vec_sum(gradients, y_i, left_inds), vec_sum(hessians, y_i, left_inds)
             right_g, right_h = vec_sum(gradients, y_i, right_inds), vec_sum(hessians, y_i, right_inds)
 
@@ -197,14 +185,8 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_
             push!(curr_stack, left_node)
             push!(curr_stack, right_node)
 
-            predictions[y_i, left_inds] .+= left_weight .* params.learning_rate
-            predictions[y_i, right_inds] .+= right_weight .* params.learning_rate
-
-            gradients .= params.grad_func(y, predictions)# .* params.case_weights[left_inds]
-            gradients .= params.grad_func(y, predictions)# .* params.case_weights[right_inds]
-#
-            hessians .= params.hess_func(y, predictions) #.* params.case_weights[left_inds]
-            hessians .= params.hess_func(y, predictions) #.* params.case_weights[right_inds]
+            update_pgh!(y, left_weight, predictions, gradients, hessians, y_i, left_inds, params)
+            update_pgh!(y, right_weight, predictions, gradients, hessians, y_i, right_inds, params)
         end
     end
     return roots, predictions

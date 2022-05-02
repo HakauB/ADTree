@@ -77,7 +77,6 @@ end
 function histogram(x::AbstractMatrix{T}, params::HyperParameters{T}) where T <: AbstractFloat
     if params.histogram_version == :frequency
         hist_bins, bin_limits, bin_sizes = frequency_histogram_dataset(x, params.num_bins)
-        #println(display(transpose(hist_bins)))
         return hist_bins, HistogramInfo{T}(bin_sizes, bin_limits)
     else
         error("Unknown histogram version")
@@ -86,9 +85,6 @@ end
 
 function histogram(x::AbstractMatrix{T}, histogram_info::HistogramInfo{T}) where T <: AbstractFloat
     hist_bins, bin_limits, bin_sizes = frequency_histogram_dataset(x, histogram_info)
-    #println(display(bin_limits))
-    #println(display(transpose(x)))
-    #println(display(transpose(hist_bins)))
     return hist_bins, HistogramInfo{T}(bin_sizes, bin_limits)
 end
 
