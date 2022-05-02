@@ -1,0 +1,7 @@
+name = "ADTree"
+uuid = "59feb58b-9adb-4ad6-afcf-6d0389f6d638"
+authors = ["HakauB <ballardhakau@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
