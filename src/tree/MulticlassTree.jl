@@ -14,7 +14,8 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessian
     search_best_gain = 0.0
     search_best_split_index = 0
     search_best_split_value = 0.0
-    for f in 1:size(x, 1)
+    split_search_results = Vector{Tuple{T, Int, Int}}(undef, size(x, 2))
+    Threads.@threads for f in 1:size(x, 2)
         gradient_bins, hessian_bins = compute_bin_gradients(x, f, gradients, hessians, y_i, indices, bin_sizes[f])
         gradient_bin_sums = cumsum(gradient_bins, dims=1)
         hessian_bin_sums = cumsum(hessian_bins, dims=1)
@@ -23,7 +24,6 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessian
 
         gains = zeros(size(gradient_bin_sums))
         @inbounds for i in eachindex(gradient_bin_sums, hessian_bin_sums)
-            #gains[i] = (gradient_bin_sums[i]^2 / (hessian_bin_sums[i] + params.L2)) + ((gradient_sum - gradient_bin_sums[i])^2 / (hessian_sum - hessian_bin_sums[i] + params.L2))
             gains[i] = calculate_gain(gradient_bin_sums[i], hessian_bin_sums[i], params) + calculate_gain(gradient_sum - gradient_bin_sums[i], hessian_sum - hessian_bin_sums[i], params)
             if isnan(gains[i])
                 gains[i] = 0.0
@@ -33,12 +33,14 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessian
         best_gain_index = argmax(gains)
         best_gain = gains[best_gain_index]
         best_split = best_gain_index
-        if best_gain > search_best_gain
-            search_best_gain = best_gain
-            search_best_split_index = f
-            search_best_split_value = best_split
-        end
+        #if best_gain > search_best_gain
+        #    search_best_gain = best_gain
+        #    search_best_split_index = f
+        #    search_best_split_value = best_split
+        #end
+        split_search_results[f] = (best_gain, f, best_split)
     end
+    search_best_gain, search_best_split_index, search_best_split_value =  maximum(split_search_results)
     return search_best_gain, search_best_split_index, search_best_split_value
 end
 
@@ -52,13 +54,13 @@ function train_greedy(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_p
     
     roots = Vector{AbstractPredictionNode}()
     for i in 1:params.num_classes
-        grad_sum = sum(gradients[i, :])
-        hess_sum = sum(hessians[i, :])
+        grad_sum = sum(gradients[:, i])
+        hess_sum = sum(hessians[:, i])
         root_weight = calculate_weight(grad_sum, hess_sum, params)
         root_gain = calculate_gain(grad_sum, hess_sum, params)
-        curr_root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), i)
+        curr_root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), i)
         push!(roots, curr_root)
-        predictions[i, :] .+= root_weight .* params.learning_rate
+        predictions[:, i] .+= root_weight .* params.learning_rate
     end
 
     gradients .= params.grad_func(y, predictions) .* params.case_weights
@@ -124,13 +126,13 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, training_
     
     roots = Vector{AbstractPredictionNode}()
     for i in 1:params.num_classes
-        grad_sum = sum(gradients[i, :])
-        hess_sum = sum(hessians[i, :])
+        grad_sum = sum(gradients[:, i])
+        hess_sum = sum(hessians[:, i])
         root_weight = calculate_weight(grad_sum, hess_sum, params)
         root_gain = calculate_gain(grad_sum, hess_sum, params)
-        curr_root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), i)
+        curr_root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), i)
         push!(roots, curr_root)
-        predictions[i, :] .+= root_weight .* params.learning_rate
+        predictions[:, i] .+= root_weight .* params.learning_rate
     end
 
     gradients .= params.grad_func(y, predictions) .* params.case_weights

@@ -14,7 +14,8 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractVector{T}, hessian
     search_best_gain = 0.0
     search_best_split_index = 0
     search_best_split_value = 0.0
-    for f in 1:size(x, 1)
+    split_search_results = Vector{Tuple{T, Int, Int}}(undef, size(x, 2))
+    Threads.@threads for f in 1:size(x, 2)
         gradient_bins, hessian_bins = compute_bin_gradients(x, f, gradients, hessians, indices, bin_sizes[f])
         gradient_bin_sums = cumsum(gradient_bins, dims=1)
         hessian_bin_sums = cumsum(hessian_bins, dims=1)
@@ -33,12 +34,14 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractVector{T}, hessian
         best_gain_index = argmax(gains)
         best_gain = gains[best_gain_index]
         best_split = best_gain_index
-        if best_gain > search_best_gain
-            search_best_gain = best_gain
-            search_best_split_index = f
-            search_best_split_value = best_split
-        end
+        #if best_gain > search_best_gain
+        #    search_best_gain = best_gain
+        #    search_best_split_index = f
+        #    search_best_split_value = best_split
+        #end
+        split_search_results[f] = (best_gain, f, best_split)
     end
+    search_best_gain, search_best_split_index, search_best_split_value =  maximum(split_search_results)
     return search_best_gain, search_best_split_index, search_best_split_value
 end
 
@@ -52,7 +55,7 @@ function train_greedy(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
     grad_sum, hess_sum = sum(gradients), sum(hessians)
     root_weight = calculate_weight(grad_sum, hess_sum, params)
     root_gain = calculate_gain(grad_sum, hess_sum, params)
-    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), 1)
+    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), 1)
     predictions .+= root_weight * params.learning_rate
     gradients .= params.grad_func(y, predictions) .* params.case_weights
     hessians .= params.hess_func(y, predictions) .* params.case_weights
@@ -96,7 +99,6 @@ function train_greedy(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    #println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 
@@ -110,7 +112,7 @@ function train_greedy_forest(x::AbstractMatrix{Int}, y::AbstractVector{T}, train
     grad_sum, hess_sum = sum(gradients), sum(hessians)
     root_weight = calculate_weight(grad_sum, hess_sum, params)
     root_gain = calculate_gain(grad_sum, hess_sum, params)
-    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), 1)
+    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), 1)
     predictions .+= root_weight * params.learning_rate
     gradients .= params.grad_func(y, predictions) .* params.case_weights
     hessians .= params.hess_func(y, predictions) .* params.case_weights
@@ -159,7 +161,7 @@ function train_greedy_forest(x::AbstractMatrix{Int}, y::AbstractVector{T}, train
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    #println(sqrt(params.loss_func(y, predictions)))
+    println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 
@@ -174,7 +176,7 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_pa
     grad_sum, hess_sum = sum(gradients), sum(hessians)
     root_weight = calculate_weight(grad_sum, hess_sum, params)
     root_gain = calculate_gain(grad_sum, hess_sum, params)
-    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), 1)
+    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), 1)
     predictions .+= root_weight * params.learning_rate
     gradients .= params.grad_func(y, predictions) .* params.case_weights
     hessians .= params.hess_func(y, predictions) .* params.case_weights
@@ -224,7 +226,7 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_pa
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    #println(sqrt(params.loss_func(y, predictions)))
+    println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 
@@ -238,7 +240,7 @@ function train_random(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
     grad_sum, hess_sum = sum(gradients), sum(hessians)
     root_weight = calculate_weight(grad_sum, hess_sum, params)
     root_gain = calculate_gain(grad_sum, hess_sum, params)
-    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 2)), Vector{SplitterNode}(), 1)
+    root = PredictionNode(1, root_weight, root_gain, collect(1:size(x, 1)), Vector{SplitterNode}(), 1)
     predictions .+= root_weight * params.learning_rate
     gradients .= params.grad_func(y, predictions) .* params.case_weights
     hessians .= params.hess_func(y, predictions) .* params.case_weights
@@ -302,7 +304,7 @@ function train_random(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    #println(sqrt(params.loss_func(y, predictions)))
+    println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 

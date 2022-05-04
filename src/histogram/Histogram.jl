@@ -55,11 +55,11 @@ end
 
 function frequency_histogram_dataset(x::AbstractMatrix{T}, num_bins::Int) where T <: AbstractFloat
     hist_bins = Matrix{Int}(undef, size(x, 1), size(x, 2))
-    bin_limits = Vector{Vector{T}}(undef, size(x, 1))
-    bin_sizes = Vector{Int}(undef, size(x, 1))
-    for i = 1:size(x, 1)
-        bin_limits[i], bin_sizes[i] = frequency_histogram_feature(x[i, :], num_bins)
-        hist_bins[i, :] = binindex(x[i, :], bin_limits[i])
+    bin_limits = Vector{Vector{T}}(undef, size(x, 2))
+    bin_sizes = Vector{Int}(undef, size(x, 2))
+    for i = 1:size(x, 2)
+        bin_limits[i], bin_sizes[i] = frequency_histogram_feature(x[:, i], num_bins)
+        hist_bins[:, i] = binindex(x[:, i], bin_limits[i])
     end
     return hist_bins, bin_limits, bin_sizes
 end
@@ -68,8 +68,8 @@ function frequency_histogram_dataset(x::AbstractMatrix{T}, histogram::HistogramI
     hist_bins = Matrix{Int}(undef, size(x, 1), size(x, 2))
     bin_sizes = histogram.num_bins
     bin_limits = histogram.hist_limits
-    for i = 1:size(x, 1)
-        hist_bins[i, :] = binindex(x[i, :], bin_limits[i])
+    for i = 1:size(x, 2)
+        hist_bins[:, i] = binindex(x[:, i], bin_limits[i])
     end
     return hist_bins, bin_limits, bin_sizes
 end
@@ -77,6 +77,7 @@ end
 function histogram(x::AbstractMatrix{T}, params::HyperParameters{T}) where T <: AbstractFloat
     if params.histogram_version == :frequency
         hist_bins, bin_limits, bin_sizes = frequency_histogram_dataset(x, params.num_bins)
+        #println(display(hist_bins))
         return hist_bins, HistogramInfo{T}(bin_sizes, bin_limits)
     else
         error("Unknown histogram version")

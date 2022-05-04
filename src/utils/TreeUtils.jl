@@ -18,12 +18,17 @@ function calculate_gain(gradient_sum::T, hessian_sum::T, params::HyperParameters
     return gradient_sum^2 / (hessian_sum + params.L2)
 end
 
-function vec_sum(x::AbstractVector{T}, indices::Vector{Int}) where T <: AbstractFloat
+@inline function vec_sum(x::AbstractVector{T}, indices::Vector{Int}) where T <: Number
     sum = 0.0
-    for i in indices
-        sum = sum + x[i]
+    @simd for i in indices
+        sum += x[i]
     end
     return sum
+    #sum = 0.0
+    #@floop for i in eachindex(indices)
+    #    @reduce sum += x[indices[i]]
+    #end
+    #return sum
 end
 
 function vec_sum(x::AbstractVector{T}) where T <: AbstractFloat
@@ -34,7 +39,7 @@ end
     grad_bins = zeros(T, num_bins)
     hess_bins = zeros(T, num_bins)
     @simd for i in indices
-        bin_i = x[f, i]
+        bin_i = x[i, f]
         grad_bins[bin_i] += gradients[i]
         hess_bins[bin_i] += hessians[i]
     end
@@ -45,7 +50,7 @@ function split_dataset(x::AbstractMatrix{Int}, split_index::Int, split_value::In
     left_indices = Vector{Int}()
     right_indices = Vector{Int}()
     @inbounds for i in indices
-        if x[split_index, i] <= split_value
+        if x[i, split_index] <= split_value
             push!(left_indices, i)
         else
             push!(right_indices, i)
@@ -80,9 +85,9 @@ function one_hot(y::Int, num_classes::Int)
 end
 
 function one_hot(y::AbstractVector{Int}, num_classes::Int)
-    v = zeros(Int, num_classes, size(y, 1))
+    v = zeros(Int, size(y, 1), num_classes)
     for i in 1:size(y, 1)
-        v[y[i], i] = 1
+        v[i, y[i]] = 1
     end
     return v
 end
@@ -91,7 +96,7 @@ function initialize_pgh(y::AbstractMatrix{Int}, params::HyperParameters{T}) wher
     if params.num_classes > 2 && params.initial_prediction != 0.5
         return fill(params.initial_prediction, size(y)), zeros(T, size(y)), zeros(T, size(y))
     end
-    return fill(1.0 / size(y, 1), size(y)), zeros(T, size(y)), zeros(T, size(y)) 
+    return fill(1.0 / size(y, 2), size(y)), zeros(T, size(y)), zeros(T, size(y)) 
 end
 
 function calculate_weights(gradient_sums::AbstractVector{T}, hessian_sums::AbstractVector{T}, params::HyperParameters{T}) where T <: AbstractFloat
@@ -105,7 +110,7 @@ end
 function vec_sum(x::AbstractMatrix{T}, f::Int, indices::Vector{Int}) where T <: AbstractFloat
     sum = 0.0
     @inbounds for i in indices
-        sum = sum + x[f, i]
+        sum = sum + x[i, f]
     end
     return sum
 end
@@ -114,22 +119,22 @@ end
     grad_bins = zeros(T, num_bins)
     hess_bins = zeros(T, num_bins)
     @simd for i in indices
-        bin_i = x[f, i]
-        grad_bins[bin_i] += gradients[y_i, i]
-        hess_bins[bin_i] += hessians[y_i, i]
+        bin_i = x[i, f]
+        grad_bins[bin_i] += gradients[i, y_i]
+        hess_bins[bin_i] += hessians[i, y_i]
     end
     return grad_bins, hess_bins
 end
 
 function update_pgh!(y::AbstractMatrix{Int}, new_weight::T, predictions::AbstractMatrix{T}, gradients::AbstractMatrix{T}, hessians::AbstractMatrix{T}, y_i::Int, indices::Vector{Int}, params::HyperParameters) where T <: Number
     if isa(params.case_weights, Vector{T})
-        predictions[y_i, indices] .= predictions[y_i, indices] .+ new_weight .* params.learning_rate
-        gradients[:, indices] .= params.grad_func(y[:, indices], predictions[:, indices]) .* params.case_weights[indices]
-        hessians[:, indices] .= params.hess_func(y[:, indices], predictions[:, indices]) .* params.case_weights[indices]
+        predictions[indices, y_i] .= predictions[indices, y_i] .+ new_weight .* params.learning_rate
+        gradients[indices, :] .= params.grad_func(y[indices, :], predictions[indices, :]) .* params.case_weights[indices]
+        hessians[indices, :] .= params.hess_func(y[indices, :], predictions[indices, :]) .* params.case_weights[indices]
     else
-        predictions[y_i, indices] .= predictions[y_i, indices] .+ new_weight .* params.learning_rate
-        gradients[:, indices] .= params.grad_func(y[:, indices], predictions[:, indices])
-        hessians[:, indices] .= params.hess_func(y[:, indices], predictions[:, indices])
+        predictions[indices, y_i] .= predictions[indices, y_i] .+ new_weight .* params.learning_rate
+        gradients[indices, :] .= params.grad_func(y[indices, :], predictions[indices, :])
+        hessians[indices, :] .= params.hess_func(y[indices, :], predictions[indices, :])
     end
 end
 
