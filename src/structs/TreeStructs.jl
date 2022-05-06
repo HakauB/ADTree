@@ -6,7 +6,7 @@ using ..TreeParameters
 abstract type AbstractPredictionNode end
 abstract type AbstractSplitterNode end
 
-export AbstractPredictionNode, SplitterNode, PredictionNode, Tree
+export AbstractPredictionNode, SplitterNode, PredictionNode, Tree, MultiTree
 
 struct SplitterNode <: AbstractSplitterNode
     split_feature::Int
@@ -26,6 +26,11 @@ end
 
 struct Tree{T<:AbstractFloat}
     root::PredictionNode{T}
+    training_params::TrainingParameters{T}
+end
+
+struct MultiTree{T<:AbstractFloat}
+    roots::Vector{AbstractPredictionNode}
     training_params::TrainingParameters{T}
 end
 

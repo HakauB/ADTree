@@ -34,11 +34,6 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractVector{T}, hessian
         best_gain_index = argmax(gains)
         best_gain = gains[best_gain_index]
         best_split = best_gain_index
-        #if best_gain > search_best_gain
-        #    search_best_gain = best_gain
-        #    search_best_split_index = f
-        #    search_best_split_value = best_split
-        #end
         split_search_results[f] = (best_gain, f, best_split)
     end
     search_best_gain, search_best_split_index, search_best_split_value =  maximum(split_search_results)
@@ -135,7 +130,7 @@ function train_greedy_forest(x::AbstractMatrix{Int}, y::AbstractVector{T}, train
                 best_split_value = split_value
             end
         end
-        best_node = stack[best_node_index]
+        #best_node = stack[best_node_index]
         best_node = popat!(stack, best_node_index)
         
         left_inds, right_inds = split_dataset(x, best_split_index, best_split_value, best_node.indices)
@@ -161,7 +156,6 @@ function train_greedy_forest(x::AbstractMatrix{Int}, y::AbstractVector{T}, train
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 
@@ -346,14 +340,14 @@ function predict(tree::Tree, x::AbstractVector{T}) where T <: AbstractFloat
 end
 
 function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
-    predictions = fill(tree.training_params.hyper_params.initial_prediction, size(x, 2))
+    predictions = fill(tree.training_params.hyper_params.initial_prediction, size(x, 1))
     x_binned, hist_info = histogram(x, tree.training_params.histogram)
-    for i in 1:size(x, 2)
+    for i in 1:size(x, 1)
         nodes = [tree.root]
         for curr_node in nodes
             predictions[i] += curr_node.weight * tree.training_params.hyper_params.learning_rate
             for splitter in curr_node.splitter_nodes
-                if x_binned[splitter.split_feature, i] <= splitter.split_value
+                if x_binned[i, splitter.split_feature] <= splitter.split_value
                     push!(nodes, splitter.left_node)
                 else
                     push!(nodes, splitter.right_node)
