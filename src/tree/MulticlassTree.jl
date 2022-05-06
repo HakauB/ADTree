@@ -335,10 +335,6 @@ function train_minimized_greedy(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, 
         update_pgh!(y, left_weight, predictions, gradients, hessians, best_y_i, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, best_y_i, right_inds, params)
     end
-    println(sum([argmax(y[i, :]) == argmax(predictions[i, :]) for i in 1:size(y, 1)]) / size(y, 1))
-    #for a in 1:25
-    #    println(argmax(y[a, :]), " v ", argmax(predictions[a, :]), " = ", predictions[a, :])
-    #end
     return root
 end
 
@@ -418,10 +414,6 @@ function train_minimized_sampled(x::AbstractMatrix{Int}, y::AbstractMatrix{Int},
         update_pgh!(y, left_weight, predictions, gradients, hessians, best_y_i, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, best_y_i, right_inds, params)
     end
-    println(sum([argmax(y[i, :]) == argmax(predictions[i, :]) for i in 1:size(y, 1)]) / size(y, 1))
-    #for a in 1:25
-    #    println(argmax(y[a, :]), " v ", argmax(predictions[a, :]), " = ", predictions[a, :])
-    #end
     return root
 end
 
@@ -465,6 +457,27 @@ function predict(multi_tree::MultiTree, x::AbstractMatrix{T}) where T <: Abstrac
                     else
                         push!(nodes, splitter.right_node)
                     end
+                end
+            end
+        end
+    end
+    return predictions
+end
+
+function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
+    predictions = fill(tree.training_params.hyper_params.initial_prediction, size(x, 1), tree.training_params.hyper_params.num_classes)
+    x_binned, hist_info = histogram(x, tree.training_params.histogram)
+
+    for i in 1:size(x, 1)
+        nodes = [tree.root]
+        for curr_node in nodes
+            y_i = curr_node.class_index
+            predictions[i, y_i] += curr_node.weight * tree.training_params.hyper_params.learning_rate
+            for splitter in curr_node.splitter_nodes
+                if x_binned[i, splitter.split_feature] <= splitter.split_value
+                    push!(nodes, splitter.left_node)
+                else
+                    push!(nodes, splitter.right_node)
                 end
             end
         end
