@@ -38,7 +38,7 @@ end
 @inline function compute_bin_gradients(x::AbstractMatrix{Int}, f::Int, gradients::AbstractVector{T}, hessians::AbstractVector{T}, indices::Vector{Int}, num_bins::Int) where T <: AbstractFloat
     grad_bins = zeros(T, num_bins)
     hess_bins = zeros(T, num_bins)
-    @simd for i in indices
+    @inbounds @simd for i in indices
         bin_i = x[i, f]
         grad_bins[bin_i] += gradients[i]
         hess_bins[bin_i] += hessians[i]
@@ -118,7 +118,7 @@ end
 @inline function compute_bin_gradients(x::AbstractMatrix{Int}, f::Int, gradients::AbstractMatrix{T}, hessians::AbstractMatrix{T}, y_i::Int, indices::Vector{Int}, num_bins::Int) where T <: AbstractFloat
     grad_bins = zeros(T, num_bins)
     hess_bins = zeros(T, num_bins)
-    @simd for i in indices
+    @inbounds @simd for i in indices
         bin_i = x[i, f]
         grad_bins[bin_i] += gradients[i, y_i]
         hess_bins[bin_i] += hessians[i, y_i]
