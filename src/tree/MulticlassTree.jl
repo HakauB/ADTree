@@ -8,7 +8,7 @@ using ..TreeUtils
 
 using StatsBase
 
-export train, predict
+export train, predict, barcode
 
 function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessians::AbstractMatrix{T}, y_i::Int, indices::Vector{Int}, bin_sizes::Vector{Int}, params::HyperParameters) where T <: AbstractFloat
     search_best_gain = 0.0
@@ -16,20 +16,31 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessian
     search_best_split_value = 0.0
     split_search_results = Vector{Tuple{T, Int, Int}}(undef, size(x, 2))
     Threads.@threads for f in 1:size(x, 2)
+        if bin_sizes[f] == 1
+            split_search_results[f] = (0.0, 0, 0)
+            continue
+        end
         gradient_bins, hessian_bins = compute_bin_gradients(x, f, gradients, hessians, y_i, indices, bin_sizes[f])
         gradient_bin_sums = cumsum(gradient_bins, dims=1)
         hessian_bin_sums = cumsum(hessian_bins, dims=1)
         gradient_sum = gradient_bin_sums[end]
         hessian_sum = hessian_bin_sums[end]
 
-        gains = zeros(size(gradient_bin_sums))
-        @inbounds for i in eachindex(gradient_bin_sums, hessian_bin_sums)
-            gains[i] = calculate_gain(gradient_bin_sums[i], hessian_bin_sums[i], params) + calculate_gain(gradient_sum - gradient_bin_sums[i], hessian_sum - hessian_bin_sums[i], params)
+        gains = zeros(T, size(gradient_bin_sums, 1) - 1)
+        @inbounds for i in 1:size(gains, 1)
+            left = calculate_gain(gradient_bin_sums[i], hessian_bin_sums[i], params)
+            right = calculate_gain(gradient_sum - gradient_bin_sums[i], hessian_sum - hessian_bin_sums[i], params)
+            gains[i] = left + right
             if isnan(gains[i])
                 gains[i] = 0.0
             end
         end
-        pop!(gains)
+
+        if size(gains, 1) == 0
+            println("F: ", f)
+            println(x[indices, f])
+        end
+        
         best_gain_index = argmax(gains)
         best_gain = gains[best_gain_index]
         best_split = best_gain_index
@@ -325,8 +336,8 @@ function train_minimized_greedy(x::AbstractMatrix{Int}, y::AbstractMatrix{Int}, 
         left_gain = calculate_gain(left_g, left_h, params)
         right_gain = calculate_gain(right_g, right_h, params)
 
-        left_node = PredictionNode(best_node.id * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
-        right_node = PredictionNode(best_node.id * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
+        left_node = PredictionNode(iter * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
+        right_node = PredictionNode(iter * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
         new_splitter = SplitterNode(best_split_index, best_split_value, left_node, right_node)
         push!(best_node.splitter_nodes, new_splitter)
         push!(stack, left_node)
@@ -404,8 +415,8 @@ function train_minimized_sampled(x::AbstractMatrix{Int}, y::AbstractMatrix{Int},
         left_gain = calculate_gain(left_g, left_h, params)
         right_gain = calculate_gain(right_g, right_h, params)
 
-        left_node = PredictionNode(best_node.id * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
-        right_node = PredictionNode(best_node.id * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
+        left_node = PredictionNode(iter * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
+        right_node = PredictionNode(iter * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
         new_splitter = SplitterNode(best_split_index, best_split_value, left_node, right_node)
         push!(best_node.splitter_nodes, new_splitter)
         push!(stack, left_node)
@@ -478,8 +489,8 @@ function train_minimized_greedy_forest(x::AbstractMatrix{Int}, y::AbstractMatrix
         left_gain = calculate_gain(left_g, left_h, params)
         right_gain = calculate_gain(right_g, right_h, params)
 
-        left_node = PredictionNode(best_node.id * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
-        right_node = PredictionNode(best_node.id * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
+        left_node = PredictionNode(iter * 2, left_weight, left_gain, collect(left_inds), Vector{SplitterNode}(), best_y_i)
+        right_node = PredictionNode(iter * 2 + 1, right_weight, right_gain, collect(right_inds), Vector{SplitterNode}(), best_y_i)
         new_splitter = SplitterNode(best_split_index, best_split_value, left_node, right_node)
         push!(best_node.splitter_nodes, new_splitter)
         push!(stack, left_node)
@@ -565,5 +576,27 @@ function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     end
     return predictions
 end
+
+function barcode(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
+    max_iters = tree.training_params.hyper_params.iterations
+    x_binned, hist_info = histogram(x, tree.training_params.histogram)
+    barcodes = fill(0, size(x, 1), 2 * max_iters + 1)
+
+    for i in 1:size(x, 1)
+        nodes = [tree.root]
+        for curr_node in nodes
+            barcodes[i, curr_node.id] = 1
+            for splitter in curr_node.splitter_nodes
+                if x_binned[i, splitter.split_feature] <= splitter.split_value
+                    push!(nodes, splitter.left_node)
+                else
+                    push!(nodes, splitter.right_node)
+                end
+            end
+        end
+    end
+    return barcodes
+end
+
 
 end

@@ -16,21 +16,26 @@ function bin_split(x::AbstractMatrix{Int}, gradients::AbstractVector{T}, hessian
     search_best_split_value = 0.0
     split_search_results = Vector{Tuple{T, Int, Int}}(undef, size(x, 2))
     Threads.@threads for f in 1:size(x, 2)
+        if bin_sizes[f] == 1
+            split_search_results[f] = (0.0, 0, 0)
+            continue
+        end
         gradient_bins, hessian_bins = compute_bin_gradients(x, f, gradients, hessians, indices, bin_sizes[f])
         gradient_bin_sums = cumsum(gradient_bins, dims=1)
         hessian_bin_sums = cumsum(hessian_bins, dims=1)
         gradient_sum = gradient_bin_sums[end]
         hessian_sum = hessian_bin_sums[end]
 
-        gains = zeros(size(gradient_bin_sums))
-        @inbounds for i in eachindex(gradient_bin_sums, hessian_bin_sums)
-            #gains[i] = (gradient_bin_sums[i]^2 / (hessian_bin_sums[i] + params.L2)) + ((gradient_sum - gradient_bin_sums[i])^2 / (hessian_sum - hessian_bin_sums[i] + params.L2))
-            gains[i] = calculate_gain(gradient_bin_sums[i], hessian_bin_sums[i], params) + calculate_gain(gradient_sum - gradient_bin_sums[i], hessian_sum - hessian_bin_sums[i], params)
+        gains = zeros(T, size(gradient_bin_sums, 1) - 1)
+        @inbounds for i in 1:size(gains, 1)
+            left = calculate_gain(gradient_bin_sums[i], hessian_bin_sums[i], params)
+            right = calculate_gain(gradient_sum - gradient_bin_sums[i], hessian_sum - hessian_bin_sums[i], params)
+            gains[i] = left + right
             if isnan(gains[i])
                 gains[i] = 0.0
             end
         end
-        pop!(gains)
+
         best_gain_index = argmax(gains)
         best_gain = gains[best_gain_index]
         best_split = best_gain_index
@@ -220,7 +225,6 @@ function train_sampled(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_pa
         update_pgh!(y, left_weight, predictions, gradients, hessians, left_inds, params)
         update_pgh!(y, right_weight, predictions, gradients, hessians, right_inds, params)
     end
-    println(sqrt(params.loss_func(y, predictions)))
     return root
 end
 
