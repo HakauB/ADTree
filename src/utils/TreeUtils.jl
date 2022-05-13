@@ -11,7 +11,7 @@ function initialize_pgh(y::AbstractVector{T}, params::HyperParameters{T}) where 
 end
 
 function calculate_weight(gradient_sum::T, hessian_sum::T, params::HyperParameters{T}) where T <: AbstractFloat
-    return -gradient_sum / hessian_sum
+    return -gradient_sum / (hessian_sum + params.L2)
 end
 
 function calculate_gain(gradient_sum::T, hessian_sum::T, params::HyperParameters{T}) where T <: AbstractFloat
