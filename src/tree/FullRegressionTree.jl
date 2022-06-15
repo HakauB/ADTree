@@ -31,9 +31,9 @@ function find_best_split(x::AbstractMatrix{T}, gradients::AbstractVector{T}, hes
     best_split_index = 0
     best_split_value = 0.0
 
-    subset_x = x[indices, :]
-    subset_gradients = gradients[indices]
-    subset_hessians = hessians[indices]
+    subset_x = @view x[indices, :]
+    subset_gradients = @view gradients[indices]
+    subset_hessians = @view hessians[indices]
 
     for f in 1:size(x, 2)
         right_grad_sum = sum(subset_gradients)
@@ -137,8 +137,8 @@ function train_greedy(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperP
         gradients[right_indices] .= params.grad_func(y[right_indices], predictions[right_indices]) .* params.case_weights
         hessians[right_indices] .= params.hess_func(y[right_indices], predictions[right_indices]) .* params.case_weights
 
-        println("Best split: ", best_split_index, " @ ", best_split_value)
-        println(sqrt(params.loss_func(y, predictions)))
+        #println("Best split: ", best_split_index, " @ ", best_split_value)
+        #println(sqrt(params.loss_func(y, predictions)))
     end
     return root
 end
