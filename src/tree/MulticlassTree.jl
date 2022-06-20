@@ -8,7 +8,7 @@ using ..TreeUtils
 
 using StatsBase
 
-export train, predict, barcode
+export train, predict, barcode, clear_train_data!, clear_train_data!, treesize, treesize
 
 function bin_split(x::AbstractMatrix{Int}, gradients::AbstractMatrix{T}, hessians::AbstractMatrix{T}, y_i::Int, indices::Vector{Int}, bin_sizes::Vector{Int}, params::HyperParameters) where T <: AbstractFloat
     search_best_gain = 0.0
@@ -506,6 +506,12 @@ function train_minimized_greedy_forest(x::AbstractMatrix{Int}, y::AbstractMatrix
     return root
 end
 
+"""
+    train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters) where T <: AbstractFloat
+
+Train a tree(s) using the given data, (x, y), according to the provided hyper parameters.
+Returns a single tree (root) where minimized training methods are used or a vector of trees (roots) otherwise.
+"""
 function train(x::AbstractMatrix{T}, y::AbstractVector{Int}, params::HyperParameters) where T <: AbstractFloat
     x_binned, hist_info = histogram(x, params)
     training_params = TrainingParameters(params, hist_info)
@@ -533,6 +539,12 @@ function train(x::AbstractMatrix{T}, y::AbstractVector{Int}, params::HyperParame
     end
 end
 
+"""
+    predict(multi_tree::MultiTree, x::AbstractMatrix{T}) where T <: AbstractFloat
+
+Calculates the predictions for the given data x, using the given trained trees.
+Returns a vector of predictions.
+"""
 function predict(multi_tree::MultiTree, x::AbstractMatrix{T}) where T <: AbstractFloat
     predictions = fill(multi_tree.training_params.hyper_params.initial_prediction, size(x, 1), multi_tree.training_params.hyper_params.num_classes)
     x_binned, hist_info = histogram(x, multi_tree.training_params.histogram)
@@ -556,6 +568,13 @@ function predict(multi_tree::MultiTree, x::AbstractMatrix{T}) where T <: Abstrac
     return predictions
 end
 
+
+"""
+    predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
+
+Calculates the predictions for the given data x, using the given trained tree.
+Returns a vector of predictions.
+"""
 function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     predictions = fill(tree.training_params.hyper_params.initial_prediction, size(x, 1), tree.training_params.hyper_params.num_classes)
     x_binned, hist_info = histogram(x, tree.training_params.histogram)
@@ -577,6 +596,12 @@ function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     return predictions
 end
 
+"""
+    barcode(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
+
+Calculates an encoding vector for the given data x, using the given trained tree. 1 if present at a prediction node and 0 if absent.
+Returns a matrix of the encodings.
+"""
 function barcode(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     max_iters = tree.training_params.hyper_params.iterations
     x_binned, hist_info = histogram(x, tree.training_params.histogram)
@@ -598,5 +623,82 @@ function barcode(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     return barcodes
 end
 
+"""
+    clear_train_data!(tree::Tree)
+Clears the training indices of the given tree, significantly reducing the in-memory size.
+Returns the tree.
+"""
+function clear_train_data!(tree::Tree)
+    nodes = [tree.root]
+    for curr_node in nodes
+        for ind in 1:size(curr_node.indices, 1)
+            pop!(curr_node.indices)
+        end
+        for splitter in curr_node.splitter_nodes
+            push!(nodes, splitter.left_node)
+            push!(nodes, splitter.right_node)   
+        end
+    end
+    return tree
+end
+
+"""
+    clear_train_data!(trees::MultiTree)
+Clears the training indices of the given trees, significantly reducing the in-memory size.
+Returns the tree.
+"""
+function clear_train_data!(trees::MultiTree)
+    for tree in trees.roots
+        nodes = [tree]
+        for curr_node in nodes
+            for ind in 1:size(curr_node.indices, 1)
+                pop!(curr_node.indices)
+            end
+            for splitter in curr_node.splitter_nodes
+                push!(nodes, splitter.left_node)
+                push!(nodes, splitter.right_node)   
+            end
+        end
+    end
+    return trees
+end
+
+"""
+    treesize(tree::Tree)
+Returns the size of the given tree.
+"""
+function treesize(tree::Tree)
+    size = 0
+    nodes = [tree.root]
+    for curr_node in nodes
+        size += sizeof(curr_node) + sizeof(curr_node.id) + sizeof(curr_node.weight) + sizeof(curr_node.gain) + sizeof(curr_node.indices) + sizeof(curr_node.splitter_nodes) + sizeof(curr_node.class_index)
+        for splitter in curr_node.splitter_nodes
+            size += sizeof(splitter.split_feature) + sizeof(splitter.split_value)
+            push!(nodes, splitter.left_node)
+            push!(nodes, splitter.right_node)
+        end
+    end
+    return size
+end
+
+"""
+    treesize(trees::MultiTree)
+Returns the size of the given trees.
+"""
+function treesize(trees::MultiTree)
+    size = 0
+    for tree in trees.roots
+        nodes = [tree]
+        for curr_node in nodes
+            size += sizeof(curr_node) + sizeof(curr_node.id) + sizeof(curr_node.weight) + sizeof(curr_node.gain) + sizeof(curr_node.indices) + sizeof(curr_node.splitter_nodes) + sizeof(curr_node.class_index)
+            for splitter in curr_node.splitter_nodes
+                size += sizeof(splitter.split_feature) + sizeof(splitter.split_value)
+                push!(nodes, splitter.left_node)
+                push!(nodes, splitter.right_node)
+            end
+        end
+    end
+    return size
+end
 
 end

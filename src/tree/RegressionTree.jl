@@ -8,7 +8,7 @@ using ..TreeUtils
 
 using StatsBase
 
-export train, predict
+export train, predict, clear_train_data!, treesize
 
 function bin_split(x::AbstractMatrix{Int}, gradients::AbstractVector{T}, hessians::AbstractVector{T}, indices::Vector{Int}, bin_sizes::Vector{Int}, params::HyperParameters) where T <: AbstractFloat
     search_best_gain = 0.0
@@ -306,6 +306,12 @@ function train_random(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
     return root
 end
 
+"""
+    train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters) where T <: AbstractFloat
+
+Train a tree using the given data, (x, y), according to the provided hyper parameters.
+Returns the tree (root).
+"""
 function train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters) where T <: AbstractFloat
     x_binned, hist_info = histogram(x, params)
     training_params = TrainingParameters(params, hist_info)
@@ -343,6 +349,12 @@ function predict(tree::Tree, x::AbstractVector{T}) where T <: AbstractFloat
     return prediction
 end
 
+"""
+    predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
+    
+Calculates the predictions for the given data x, using the given trained tree.
+Returns a vector of predictions.
+"""
 function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     predictions = fill(tree.training_params.hyper_params.initial_prediction, size(x, 1))
     x_binned, hist_info = histogram(x, tree.training_params.histogram)
@@ -360,6 +372,43 @@ function predict(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
         end
     end
     return predictions
+end
+
+"""
+    clear_train_data!(tree::Tree)
+Clears the training indices of the given tree, significantly reducing the in-memory size.
+Returns the tree.
+"""
+function clear_train_data!(tree::Tree)
+    nodes = [tree.root]
+    for curr_node in nodes
+        for ind in 1:size(curr_node.indices, 1)
+            pop!(curr_node.indices)
+        end
+        for splitter in curr_node.splitter_nodes
+            push!(nodes, splitter.left_node)
+            push!(nodes, splitter.right_node)   
+        end
+    end
+    return tree
+end
+
+"""
+    treesize(tree::Tree)
+Returns the size of the given tree.
+"""
+function treesize(tree::Tree)
+    size = 0
+    nodes = [tree.root]
+    for curr_node in nodes
+        size += sizeof(curr_node) + sizeof(curr_node.id) + sizeof(curr_node.weight) + sizeof(curr_node.gain) + sizeof(curr_node.indices) + sizeof(curr_node.splitter_nodes) + sizeof(curr_node.class_index)
+        for splitter in curr_node.splitter_nodes
+            size += sizeof(splitter.split_feature) + sizeof(splitter.split_value)
+            push!(nodes, splitter.left_node)
+            push!(nodes, splitter.right_node)
+        end
+    end
+    return size
 end
 
 end
