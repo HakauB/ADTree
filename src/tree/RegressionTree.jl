@@ -306,23 +306,23 @@ function train_random(x::AbstractMatrix{Int}, y::AbstractVector{T}, training_par
     return root
 end
 
-function train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters; method::Symbol=:greedy) where T <: AbstractFloat
+function train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters) where T <: AbstractFloat
     x_binned, hist_info = histogram(x, params)
     training_params = TrainingParameters(params, hist_info)
-    if method == :greedy
+    if params.method == :greedy
         root = train_greedy(x_binned, y, training_params)
         return Tree(root, training_params)
-    elseif method == :sampled
+    elseif params.method == :sampled
         root = train_sampled(x_binned, y, training_params)
         return Tree(root, training_params)
-    elseif method == :random
+    elseif params.method == :random
         root = train_random(x_binned, y, training_params)
         return Tree(root, training_params)
-    elseif method == :greedyforest
+    elseif params.method == :greedyforest
         root = train_greedy_forest(x_binned, y, training_params)
         return Tree(root, training_params)
     else
-        error("Unknown training method: " + method)
+        error("Unknown training method: " + params.method)
     end
 end
 

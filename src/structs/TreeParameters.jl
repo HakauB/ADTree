@@ -19,6 +19,7 @@ export HyperParameters, TrainingParameters
     loss_func::Function=(y, y_hat) -> sum((y .- y_hat).^2) / size(y, 1)
     grad_func::Function=(y, y_hat) -> y_hat - y
     hess_func::Function=(y, y_hat) -> 1.0
+    method::Symbol = :greedy
 end
 
 struct TrainingParameters{T<:AbstractFloat}

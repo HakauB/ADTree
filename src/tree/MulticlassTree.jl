@@ -506,30 +506,30 @@ function train_minimized_greedy_forest(x::AbstractMatrix{Int}, y::AbstractMatrix
     return root
 end
 
-function train(x::AbstractMatrix{T}, y::AbstractVector{Int}, params::HyperParameters; method::Symbol=:greedy) where T <: AbstractFloat
+function train(x::AbstractMatrix{T}, y::AbstractVector{Int}, params::HyperParameters) where T <: AbstractFloat
     x_binned, hist_info = histogram(x, params)
     training_params = TrainingParameters(params, hist_info)
     y_hot = one_hot(y, params.num_classes)
-    if method == :greedy
+    if params.method == :greedy
         roots = train_greedy(x_binned, y_hot, training_params)
         return MultiTree(roots, training_params)
-    elseif method == :sampled
+    elseif params.method == :sampled
         roots = train_sampled(x_binned, y_hot, training_params)
         return MultiTree(roots, training_params)
-    elseif method == :greedyforest
+    elseif params.method == :greedyforest
         roots = train_greedy_forest(x_binned, y_hot, training_params)
         return MultiTree(roots, training_params)
-    elseif method == :minimizedgreedy
+    elseif params.method == :minimizedgreedy
         root = train_minimized_greedy(x_binned, y_hot, training_params)
         return Tree(root, training_params)
-    elseif method == :minimizedsampled
+    elseif params.method == :minimizedsampled
         root = train_minimized_sampled(x_binned, y_hot, training_params)
         return Tree(root, training_params)
-    elseif method == :minimizedgreedyforest
+    elseif params.method == :minimizedgreedyforest
         root = train_minimized_greedy_forest(x_binned, y_hot, training_params)
         return Tree(root, training_params)
     else
-        error("Unknown method")
+        error("Unknown method: " + params.method)
     end
 end
 

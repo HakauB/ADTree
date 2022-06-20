@@ -143,11 +143,11 @@ function train_greedy(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperP
     return root
 end
 
-function train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters; method::Symbol=:greedy) where T <: AbstractFloat
-    if method == :greedy
+function train(x::AbstractMatrix{T}, y::AbstractVector{T}, params::HyperParameters) where T <: AbstractFloat
+    if params.method == :greedy
         return train_greedy(x, y, params)
     else
-        error("Unknown method: " + method)
+        error("Unknown method: " + params.method)
     end
 end
 
