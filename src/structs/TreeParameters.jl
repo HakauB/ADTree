@@ -14,7 +14,7 @@ export HyperParameters, TrainingParameters
     L2::T = 1.0
     initial_prediction::T = 0.5
     histogram_version::Symbol = :frequency
-    num_bins::Int = 30
+    num_bins::Int = 32
     case_weights::Union{T, Vector{T}} = 1.0
     loss_func::Function=(y, y_hat) -> sum((y .- y_hat).^2) / size(y, 1)
     grad_func::Function=(y, y_hat) -> y_hat - y
