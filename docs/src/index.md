@@ -1,5 +1,6 @@
 # ADTree Documentation
 ```@meta
+using .ADTree
 CurrentModule = ADTree
 ```
 

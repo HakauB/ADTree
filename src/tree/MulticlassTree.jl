@@ -623,13 +623,8 @@ function barcode(tree::Tree, x::AbstractMatrix{T}) where T <: AbstractFloat
     return barcodes
 end
 
-"""
-    clear_train_data!(tree::Tree)
-Clears the training indices of the given tree, significantly reducing the in-memory size.
-Returns the tree.
-"""
-function clear_train_data!(tree::Tree)
-    nodes = [tree.root]
+function _clear_train_data(node::AbstractPredictionNode)
+    nodes = [node]
     for curr_node in nodes
         for ind in 1:size(curr_node.indices, 1)
             pop!(curr_node.indices)
@@ -639,6 +634,15 @@ function clear_train_data!(tree::Tree)
             push!(nodes, splitter.right_node)   
         end
     end
+end
+
+"""
+    clear_train_data!(tree::Tree)
+Clears the training indices of the given tree, significantly reducing the in-memory size.
+Returns the tree.
+"""
+function clear_train_data!(tree::Tree)
+    _clear_train_data(tree.root)
     return tree
 end
 
@@ -649,16 +653,7 @@ Returns the tree.
 """
 function clear_train_data!(trees::MultiTree)
     for tree in trees.roots
-        nodes = [tree]
-        for curr_node in nodes
-            for ind in 1:size(curr_node.indices, 1)
-                pop!(curr_node.indices)
-            end
-            for splitter in curr_node.splitter_nodes
-                push!(nodes, splitter.left_node)
-                push!(nodes, splitter.right_node)   
-            end
-        end
+        _clear_train_data(tree)
     end
     return trees
 end
@@ -668,17 +663,8 @@ end
 Returns the size of the given tree.
 """
 function treesize(tree::Tree)
-    size = 0
-    nodes = [tree.root]
-    for curr_node in nodes
-        size += sizeof(curr_node) + sizeof(curr_node.id) + sizeof(curr_node.weight) + sizeof(curr_node.gain) + sizeof(curr_node.indices) + sizeof(curr_node.splitter_nodes) + sizeof(curr_node.class_index)
-        for splitter in curr_node.splitter_nodes
-            size += sizeof(splitter.split_feature) + sizeof(splitter.split_value)
-            push!(nodes, splitter.left_node)
-            push!(nodes, splitter.right_node)
-        end
-    end
-    return size
+    # This is not an exposed function and may not be future-proof.
+    return Base.summarysize(tree)
 end
 
 """
@@ -686,19 +672,8 @@ end
 Returns the size of the given trees.
 """
 function treesize(trees::MultiTree)
-    size = 0
-    for tree in trees.roots
-        nodes = [tree]
-        for curr_node in nodes
-            size += sizeof(curr_node) + sizeof(curr_node.id) + sizeof(curr_node.weight) + sizeof(curr_node.gain) + sizeof(curr_node.indices) + sizeof(curr_node.splitter_nodes) + sizeof(curr_node.class_index)
-            for splitter in curr_node.splitter_nodes
-                size += sizeof(splitter.split_feature) + sizeof(splitter.split_value)
-                push!(nodes, splitter.left_node)
-                push!(nodes, splitter.right_node)
-            end
-        end
-    end
-    return size
+    # This is not an exposed function and may not be future-proof.
+    return Base.summarysize(trees)
 end
 
 end
